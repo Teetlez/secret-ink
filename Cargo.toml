@@ -5,10 +5,12 @@ edition = "2024"
 
 
 [dependencies]
-pulldown-cmark = "0.13.0"                         # Markdown parser
-image = "0.25.6"                                  # Basic image buffer and I/O
-imageproc = "0.25.0"                              # Drawing primitives (text, shapes, etc.)
-rusttype = "0.9"                                  # Font rasterization
-photon-rs = "0.3.3"                               # Post-processing filters (noise, blur, etc.)
-rand = "0.9.1"                                    # For random jitter
-clap = { version = "4.0", features = ["derive"] }
+cosmic-text = "0.14"
+env_logger = "0.11"
+fontdb = "0.23"
+log = "0.4"
+softbuffer = "0.4"
+tiny-skia = "0.11"
+unicode-segmentation = "1.7"
+winit = "0.29"
+fastrand = "2.3.0"
