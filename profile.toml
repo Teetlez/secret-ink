@@ -1,0 +1,25 @@
+# config.toml
+page_width = 2480
+page_height = 3508
+margin_top = 200
+margin_bottom = 200
+margin_left = 200
+margin_right = 200
+
+default_font = "fonts/trixie_plain/trixie-plain.otf"
+heading_font = "fonts/wormhole-typewriter/Wormhole-Type.otf"
+stamp_font = "fonts/stampwriter_kit/STAMPWRITER-KIT.ttf"
+font_size = 32.0
+heading_size = 48.0
+stamp_size = 64.0
+
+jitter_px = 0.0
+blur_sigma = 0.2
+ink_opacity = 0.9
+
+redaction_marker = "=="
+stamp_marker = "!!"
+
+paper_albedo = "paper/CC0-Texture-Paper01/PaperAlbedo.png"
+paper_normal = "paper/CC0-Texture-Paper01/PaperNormal.png"
+paper_roughness = "paper/CC0-Texture-Paper01/PaperRough.png"
