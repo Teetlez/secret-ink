@@ -1,10 +1,10 @@
 # config.toml
-page_width = 2480
-page_height = 3508
-margin_top = 200
-margin_bottom = 200
-margin_left = 200
-margin_right = 200
+page_width = 300
+page_height = 300
+margin_top = 100
+margin_bottom = 100
+margin_left = 100
+margin_right = 100
 
 default_font = "fonts/trixie_plain/trixie-plain.otf"
 heading_font = "fonts/wormhole-typewriter/Wormhole-Type.otf"
@@ -13,7 +13,7 @@ font_size = 32.0
 heading_size = 48.0
 stamp_size = 64.0
 
-jitter_px = 0.0
+jitter_px = 2.0
 blur_sigma = 0.2
 ink_opacity = 0.9
 

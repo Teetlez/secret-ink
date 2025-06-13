@@ -12,10 +12,10 @@ pub fn parse_document(text: &str, cfg: &Config) -> Vec<Block> {
     let mut blocks = Vec::new();
 
     for line in text.lines() {
-        if let Some(stripped) = line.strip_prefix('#') {
+        if line.trim().starts_with('#') {
             // count #s for level
             let level = line.chars().take_while(|c| *c == '#').count() as u32;
-            let text = stripped.trim().to_string();
+            let text = line.trim_start_matches('#').to_string();
             blocks.push(Block::Heading { level, text });
         } else if line.contains(&cfg.redaction_marker) {
             // capture redaction content

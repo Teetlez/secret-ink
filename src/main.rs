@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 7. Save
     print!("writing to image...");
-    canvas.save("output_page1.png")?;
+    canvas.save("output.png")?;
     println!("OK");
 
     Ok(())
