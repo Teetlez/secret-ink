@@ -37,7 +37,7 @@ pub fn render_page(
         // 5) Blend ink into canvas
         blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
     }
-
+    draw_margins(&mut canvas, &cfg);
     canvas
 }
 
@@ -59,7 +59,7 @@ fn rasterize_glyph(glyph: &Glyph, font: &FontRef) -> (GrayImage, i32, i32) {
     if let Some(outline) = font.outline_glyph(glyph.clone()) {
         outline.draw(|x, y, c| {
             let pixel = mask.get_pixel_mut(x, y);
-            *pixel = Luma([(c * 255.0).round() as u8]);
+            *pixel = Luma([(c * 255.0 as f32).round() as u8]);
         });
     }
 
@@ -109,5 +109,31 @@ fn blend_ink(
                 dst[i] = ((dst[i] as f32) * (1.0 - ink_a)).round() as u8;
             }
         }
+    }
+}
+
+fn draw_margins(canvas: &mut RgbaImage, cfg: &Config) {
+    let left = cfg.margin_left;
+    let right = cfg.page_width - cfg.margin_right;
+    let top = cfg.margin_top;
+    let bottom = cfg.page_height - cfg.margin_bottom;
+    let center_h = cfg.page_height / 2;
+    let center_v = cfg.page_width / 2;
+    let dim = canvas.dimensions();
+    for i in 0..dim.0 {
+        let px = canvas.get_pixel_mut(i, top);
+        px[0] = 0;
+        let px = canvas.get_pixel_mut(i, center_h);
+        px[1] = 0;
+        let px = canvas.get_pixel_mut(i, bottom);
+        px[2] = 0;
+    }
+    for j in 0..dim.1 {
+        let px = canvas.get_pixel_mut(left, j);
+        px[0] = 0;
+        let px = canvas.get_pixel_mut(center_v, j);
+        px[1] = 0;
+        let px = canvas.get_pixel_mut(right, j);
+        px[2] = 0;
     }
 }

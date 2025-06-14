@@ -10,6 +10,10 @@ pub struct GlyphInstance {
     pub font_key: String,
 }
 
+const paragraph_scale: f32 = 20.0;
+const paragraph_height: f32 = 18.0;
+const header_scale: f32 = 50.0;
+
 /// Lay out and position glyphs for each block of the document.
 pub fn layout_blocks(
     blocks: &[Block],
@@ -20,43 +24,52 @@ pub fn layout_blocks(
     let mut cursor_y = cfg.margin_top as f32;
 
     // Wrap options with full width and optimal-fit algorithm
-    let wrap_width = (cfg.page_width - (cfg.margin_left + cfg.margin_right)) as usize;
-    let wrap_opts =
-        Options::new(wrap_width).wrap_algorithm(WrapAlgorithm::OptimalFit(Penalties::default()));
+    let wrap_width =
+        (cfg.page_width - (cfg.margin_left + cfg.margin_right)) as usize / paragraph_scale as usize;
+    let wrap_opts = Options::new(wrap_width)
+        .wrap_algorithm(WrapAlgorithm::OptimalFit(Penalties::default()))
+        .initial_indent("    ");
 
     for block in blocks {
         match block {
             Block::Heading { level, text } => {
                 // Determine font scale per heading level
-                let scale = match level {
-                    1 => 128.0,
-                    2 => 64.0,
-                    3 => 32.0,
-                    _ => 16.0,
-                };
                 let key = "heading".to_string();
                 let font_ref = &fonts[&key];
-                let font = font_ref.as_scaled(scale);
+                let scale = match level {
+                    1 => 1.0,
+                    2 => 0.75,
+                    3 => 0.50,
+                    _ => 0.32,
+                };
+                let font = font_ref.as_scaled(scale * cfg.heading_size);
 
                 // Centered horizontally
-                let total_w = measure_text_width(font_ref, text, scale);
-                let mut x = (cfg.page_width as f32 - total_w) / 2.0;
+                let total_w = measure_text_width(font_ref, text, scale * cfg.heading_size);
+                let mut x = (cfg.page_width / 2) as f32 - (total_w * 0.5);
+                let mut last: Option<ab_glyph::Glyph> = None;
 
                 // Baseline for this heading line
-                let baseline = cursor_y + font.ascent();
+                let baseline = cursor_y;
                 for ch in text.chars() {
                     let id = font_ref.glyph_id(ch);
+                    if let Some(prev) = last.take() {
+                        x += font.kern(prev.id, id);
+                    }
                     x += font.h_side_bearing(id);
-                    let glyph = id.with_scale_and_position(scale, point(x, baseline));
+                    let glyph =
+                        id.with_scale_and_position(scale * cfg.heading_size, point(x, baseline));
                     instances.push(GlyphInstance {
                         glyph: glyph.clone(),
                         font_key: key.clone(),
                     });
-                    x += font.h_advance(id);
+
+                    last = Some(glyph.clone());
+                    x += font.h_advance(id) * 1.2;
                 }
 
                 // Advance cursor with extra spacing
-                cursor_y += font.height() + font.line_gap() * 1.2;
+                cursor_y += scale;
             }
 
             Block::Paragraph(text) => {
@@ -77,9 +90,8 @@ pub fn layout_blocks(
                 );
 
                 // Move cursor down by paragraph height (approximate)
-                cursor_y = &temp.last().map(|g| g.position.y).unwrap_or(cursor_y)
-                    + font.height()
-                    + font.line_gap();
+                cursor_y =
+                    &temp.last().map(|g| g.position.y).unwrap_or(cursor_y) + paragraph_height;
 
                 for glyph in temp {
                     instances.push(GlyphInstance {
@@ -92,12 +104,10 @@ pub fn layout_blocks(
             Block::Redaction(inner) => {
                 // TODO: draw a solid black rectangle at (cfg.margin_left, cursor_y)
                 // with width measured by text length and height = line height
-                cursor_y += cfg.font_size * 1.2;
             }
 
             Block::Stamp(inner) => {
                 // TODO: schedule stamp drawing at bottom or top
-                cursor_y += cfg.stamp_size * 1.2;
             }
         }
     }
@@ -117,25 +127,26 @@ pub fn layout_paragraph<F, SF>(
     F: ab_glyph::Font,
     SF: ab_glyph::ScaleFont<F>,
 {
-    let v_advance = font.height() + font.line_gap();
-    let mut caret = position + point(50.0, font.ascent());
+    let mut caret = position + point(0.0, font.ascent());
     let mut last: Option<ab_glyph::Glyph> = None;
 
     for line in text {
         println!("{}", line);
         for c in line.chars() {
             let mut glyph = font.scaled_glyph(c);
-            if let Some(prev) = last.take() {
-                caret.x += font.kern(prev.id, glyph.id);
-            }
+            // if let Some(prev) = last.take() {
+            //     caret.x += font.kern(prev.id, glyph.id);
+            // }
             glyph.position = caret;
-
-            last = Some(glyph.clone());
-            caret.x += font.h_advance(glyph.id);
+            // last = Some(glyph.clone());
+            caret.x += paragraph_scale;
             target.push(glyph);
         }
-        caret = point(position.x, caret.y + v_advance);
-        last = None;
+        caret = point(
+            position.x + (fastrand::f32() * 2.0 - 1.0),
+            caret.y + paragraph_height,
+        );
+        // last = None;
     }
 }
 
