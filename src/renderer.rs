@@ -41,7 +41,43 @@ pub fn render_page(
         // 5) Blend ink into canvas
         blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
     }
-    redact(redactions, &mut canvas);
+    for redaction in redactions {
+        // 1) rasterize\
+        let margin = 5;
+        let (width, height) = (
+            (redaction.end.unwrap_or_default().x - redaction.start.x).ceil() as u32 + (margin * 2),
+            (redaction.thickness * 1.2).ceil() as u32 + (margin * 2),
+        );
+        let mut r_box = GrayImage::new(width, height);
+        for x in margin..(width - margin) {
+            for y in margin..(height - margin) {
+                if let Some(p) = r_box.get_pixel_mut_checked(x, y) {
+                    *p = Luma([(200.0 + (fastrand::f32() * 1000.0) - 100.0)
+                        .clamp(0.0, 255.0)
+                        .round() as u8])
+                }
+            }
+        }
+
+        // 2) bleed blur
+        let blurred = gaussian_blur_f32(&r_box, cfg.blur_sigma * 1.5 + (fastrand::f32() * 0.5));
+
+        // 3) jitter offset (rotate?)
+        let (dx, dy) = (
+            (fastrand::f32() - 0.5) * cfg.jitter_px,
+            (fastrand::f32() - 0.5) * cfg.jitter_px,
+        );
+        let x0 = (redaction.start.x + dx).ceil() as u32 - margin;
+        let y0 =
+            ((redaction.start.y * 2.0) + dy).ceil() as u32 - (redaction.thickness as u32 + margin);
+
+        // 4) blend over document
+        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+    }
+    // redact(redactions, &mut canvas, cfg, normal, roughness);
     // draw_margins(&mut canvas, &cfg);
     canvas
 }
@@ -64,7 +100,7 @@ fn rasterize_glyph(glyph: &Glyph, font: &FontRef) -> (GrayImage, i32, i32) {
     if let Some(outline) = font.outline_glyph(glyph.clone()) {
         outline.draw(|x, y, c| {
             let pixel = mask.get_pixel_mut(x, y);
-            *pixel = Luma([(c * 255.0 as f32).round() as u8]);
+            *pixel = Luma([((c + ((fastrand::f32() * 0.2) - 0.1)) * 255.0 as f32).round() as u8]);
         });
     }
 
@@ -75,7 +111,13 @@ fn rasterize_glyph(glyph: &Glyph, font: &FontRef) -> (GrayImage, i32, i32) {
     )
 }
 
-fn redact(redactions: &[Redaction], canvas: &mut RgbaImage) {
+fn redact(
+    redactions: &[Redaction],
+    canvas: &mut RgbaImage,
+    cfg: &Config,
+    normal: &RgbaImage,
+    rough: &GrayImage,
+) {
     for red in redactions {
         let (w, h) = (
             (red.end.unwrap_or_default().x - red.start.x).ceil() as u32 + 1,
@@ -90,19 +132,20 @@ fn redact(redactions: &[Redaction], canvas: &mut RgbaImage) {
                     continue;
                 }
 
+                let nz = normal.get_pixel(cx, cy)[2] as f32 / 255.0;
+                let roughness = rough.get_pixel(cx, cy)[0] as f32 / 255.0;
+
+                // Modulate ink alpha by light & roughness
+                let light_mod = 1.0 + 0.2 * (1.0 - nz);
+                let ink_a = (1.0 - cfg.ink_opacity) * light_mod * roughness * fastrand::f32();
+
+                // Multiply blend: darken canvas
                 let dst = canvas.get_pixel_mut(cx, cy);
                 for i in 0..3 {
-                    dst[i] = 0;
+                    dst[i] = ((dst[i] as f32) * ink_a).round() as u8;
                 }
             }
         }
-        let dst = canvas.get_pixel_mut(red.start.x as u32, red.start.y as u32);
-        dst[0] = 255;
-        let dst = canvas.get_pixel_mut(
-            red.end.unwrap_or(red.start).x as u32,
-            red.end.unwrap_or(red.start).y as u32,
-        );
-        dst[2] = 255;
     }
 }
 

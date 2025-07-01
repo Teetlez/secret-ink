@@ -11,6 +11,10 @@ pub struct Config {
     pub margin_left: u32,
     pub margin_right: u32,
 
+    // Spacing
+    pub letter_spacing: f32,
+    pub line_spacing: f32,
+
     // Fonts
     pub default_font: PathBuf,
     pub heading_font: PathBuf,

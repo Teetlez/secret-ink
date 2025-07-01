@@ -36,8 +36,6 @@ impl Redaction {
     }
 }
 
-const paragraph_scale: f32 = 20.0;
-const paragraph_height: f32 = 16.0;
 const header_scale: f32 = 50.0;
 
 /// Lay out and position glyphs for each block of the document.
@@ -51,8 +49,8 @@ pub fn layout_blocks(
     let mut redactions: Vec<Redaction> = Vec::new();
 
     // Wrap options with full width and optimal-fit algorithm
-    let wrap_width =
-        (cfg.page_width - (cfg.margin_left + cfg.margin_right)) as usize / paragraph_scale as usize;
+    let wrap_width = (cfg.page_width - (cfg.margin_left + cfg.margin_right)) as usize
+        / cfg.letter_spacing as usize;
     let wrap_opts = Options::new(wrap_width)
         .wrap_algorithm(WrapAlgorithm::OptimalFit(Penalties::default()))
         .initial_indent("    ");
@@ -115,12 +113,13 @@ pub fn layout_blocks(
                     (cfg.page_width - cfg.margin_left - cfg.margin_right) as f32,
                     &text,
                     &mut temp,
+                    &cfg,
                 );
                 redactions.append(&mut new_redactions);
 
                 // Move cursor down by paragraph height (approximate)
                 cursor_y =
-                    &temp.last().map(|g| g.position.y).unwrap_or(cursor_y) + paragraph_height;
+                    &temp.last().map(|g| g.position.y).unwrap_or(cursor_y) + cfg.line_spacing;
 
                 for glyph in temp {
                     instances.push(GlyphInstance {
@@ -147,6 +146,7 @@ pub fn layout_paragraph<F, SF>(
     max_width: f32,
     text: &Vec<Cow<'_, str>>,
     target: &mut Vec<ab_glyph::Glyph>,
+    cfg: &Config,
 ) -> Vec<Redaction>
 where
     F: ab_glyph::Font,
@@ -174,12 +174,12 @@ where
             // }
             glyph.position = caret;
             // last = Some(glyph.clone());
-            caret.x += paragraph_scale;
+            caret.x += cfg.letter_spacing;
             target.push(glyph);
         }
         let new_caret = point(
             position.x + (fastrand::f32() * 2.0 - 1.0),
-            caret.y + paragraph_height,
+            caret.y + cfg.line_spacing,
         );
         if redactions.last().map_or(false, |r| r.end.is_none()) {
             redactions.last_mut().map(|r| r.close(caret));
