@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Layout glyphs
     print!("creating text layout...");
-    let glyphs = layout_blocks(&blocks, &fonts, &cfg);
+    let (glyphs, redactions) = layout_blocks(&blocks, &fonts, &cfg);
     println!("OK");
 
     // 6. Render page(s)
@@ -53,6 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canvas = renderer::render_page(
         &fonts,
         &glyphs,
+        &redactions,
         &textures.albedo,
         &textures.normal,
         &textures.roughness,

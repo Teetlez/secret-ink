@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{config::Config, layout::GlyphInstance};
+use crate::{
+    config::Config,
+    layout::{GlyphInstance, Redaction},
+};
 use ab_glyph::{Font, FontRef, Glyph, ScaleFont};
 use image::{GrayImage, Luma, Rgba, RgbaImage};
 use imageproc::filter::gaussian_blur_f32;
@@ -10,6 +13,7 @@ use imageproc::filter::gaussian_blur_f32;
 pub fn render_page(
     fonts: &HashMap<String, FontRef>,
     glyphs: &[GlyphInstance],
+    redactions: &[Redaction],
     paper: &RgbaImage,
     normal: &RgbaImage,
     roughness: &GrayImage,
@@ -37,7 +41,8 @@ pub fn render_page(
         // 5) Blend ink into canvas
         blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
     }
-    draw_margins(&mut canvas, &cfg);
+    redact(redactions, &mut canvas);
+    // draw_margins(&mut canvas, &cfg);
     canvas
 }
 
@@ -69,7 +74,38 @@ fn rasterize_glyph(glyph: &Glyph, font: &FontRef) -> (GrayImage, i32, i32) {
         bounds.min.y.floor() as i32,
     )
 }
-///
+
+fn redact(redactions: &[Redaction], canvas: &mut RgbaImage) {
+    for red in redactions {
+        let (w, h) = (
+            (red.end.unwrap_or_default().x - red.start.x).ceil() as u32 + 1,
+            (red.thickness * 1.2) as u32,
+        );
+        for x in 0..w {
+            for y in 0..h {
+                let cx = red.start.x.ceil() as u32 + x;
+                let cy = (red.start.y * 2.0).ceil() as u32 + y - red.thickness as u32;
+
+                if cx >= canvas.width() || cy >= canvas.height() {
+                    continue;
+                }
+
+                let dst = canvas.get_pixel_mut(cx, cy);
+                for i in 0..3 {
+                    dst[i] = 0;
+                }
+            }
+        }
+        let dst = canvas.get_pixel_mut(red.start.x as u32, red.start.y as u32);
+        dst[0] = 255;
+        let dst = canvas.get_pixel_mut(
+            red.end.unwrap_or(red.start).x as u32,
+            red.end.unwrap_or(red.start).y as u32,
+        );
+        dst[2] = 255;
+    }
+}
+
 /// Blend ink mask into the RGBA canvas using paper normal & roughness
 fn blend_ink(
     canvas: &mut RgbaImage,

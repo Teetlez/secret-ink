@@ -6,12 +6,12 @@ margin_bottom = 200
 margin_left = 100
 margin_right = 100
 
-default_font = "fonts/trixie_plain/trixie-plain.otf"
-heading_font = "fonts/wormhole-typewriter/Wormhole-Type.otf"
+default_font = "fonts/Special_Elite/SpecialElite-Regular.ttf"
+heading_font = "fonts/Pica/Pica.ttf"
 stamp_font = "fonts/stampwriter_kit/STAMPWRITER-KIT.ttf"
-font_size = 48.0
-heading_size = 56.0
-stamp_size = 64.0
+font_size = 32.0
+heading_size = 64.0
+stamp_size = 72.0
 
 jitter_px = 2.0
 blur_sigma = 0.3

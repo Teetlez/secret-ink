@@ -1,17 +1,43 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::{config::Config, parser::Block};
-use ab_glyph::{Font, FontRef, Glyph, ScaleFont, point};
+use ab_glyph::{Font, FontRef, Glyph, Point, ScaleFont, point};
 use textwrap::{Options, WrapAlgorithm, wrap_algorithms::Penalties};
 
+#[derive(Debug, Clone)]
 /// Represents a positioned glyph on the page.
 pub struct GlyphInstance {
     pub glyph: Glyph,
     pub font_key: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct Redaction {
+    pub start: Point,
+    pub end: Option<Point>,
+    pub thickness: f32,
+}
+
+impl Redaction {
+    pub fn new(p: Point, t: f32) -> Self {
+        Redaction {
+            start: p,
+            end: None,
+            thickness: t,
+        }
+    }
+    pub fn close(&mut self, p: Point) {
+        if self.end.is_none() {
+            self.end = Some(p);
+        }
+    }
+    pub fn is_open(&self) -> bool {
+        self.end.is_none()
+    }
+}
+
 const paragraph_scale: f32 = 20.0;
-const paragraph_height: f32 = 18.0;
+const paragraph_height: f32 = 16.0;
 const header_scale: f32 = 50.0;
 
 /// Lay out and position glyphs for each block of the document.
@@ -19,9 +45,10 @@ pub fn layout_blocks(
     blocks: &[Block],
     fonts: &HashMap<String, FontRef>,
     cfg: &Config,
-) -> Vec<GlyphInstance> {
+) -> (Vec<GlyphInstance>, Vec<Redaction>) {
     let mut instances = Vec::new();
     let mut cursor_y = cfg.margin_top as f32;
+    let mut redactions: Vec<Redaction> = Vec::new();
 
     // Wrap options with full width and optimal-fit algorithm
     let wrap_width =
@@ -38,9 +65,9 @@ pub fn layout_blocks(
                 let font_ref = &fonts[&key];
                 let scale = match level {
                     1 => 1.0,
-                    2 => 0.75,
-                    3 => 0.50,
-                    _ => 0.32,
+                    2 => 0.85,
+                    3 => 0.65,
+                    _ => 0.55,
                 };
                 let font = font_ref.as_scaled(scale * cfg.heading_size);
 
@@ -78,16 +105,18 @@ pub fn layout_blocks(
                 let font_ref = &fonts[&key];
                 let font = font_ref.as_scaled(cfg.font_size);
                 let start = point(cfg.margin_left as f32, cursor_y);
-                let text = textwrap::wrap(text, &wrap_opts);
+                let text = textwrap::wrap(&text, &wrap_opts);
                 // Collect glyphs, then convert to GlyphInstance
                 let mut temp = Vec::new();
-                layout_paragraph(
+
+                let mut new_redactions = layout_paragraph(
                     font.clone(),
                     start,
                     (cfg.page_width - cfg.margin_left - cfg.margin_right) as f32,
                     &text,
                     &mut temp,
                 );
+                redactions.append(&mut new_redactions);
 
                 // Move cursor down by paragraph height (approximate)
                 cursor_y =
@@ -101,18 +130,13 @@ pub fn layout_blocks(
                 }
             }
 
-            Block::Redaction(inner) => {
-                // TODO: draw a solid black rectangle at (cfg.margin_left, cursor_y)
-                // with width measured by text length and height = line height
-            }
-
             Block::Stamp(inner) => {
                 // TODO: schedule stamp drawing at bottom or top
             }
         }
     }
 
-    instances
+    (instances, redactions)
 }
 
 /// Layout a single paragraph of text into glyph positions.
@@ -123,16 +147,27 @@ pub fn layout_paragraph<F, SF>(
     max_width: f32,
     text: &Vec<Cow<'_, str>>,
     target: &mut Vec<ab_glyph::Glyph>,
-) where
+) -> Vec<Redaction>
+where
     F: ab_glyph::Font,
     SF: ab_glyph::ScaleFont<F>,
 {
     let mut caret = position + point(0.0, font.ascent());
     let mut last: Option<ab_glyph::Glyph> = None;
-
+    let mut redactions: Vec<Redaction> = Vec::new();
     for line in text {
         println!("{}", line);
         for c in line.chars() {
+            if c == '\u{20D2}' {
+                if let Some(r) = redactions.last_mut() {
+                    if r.is_open() {
+                        r.close(caret);
+                        continue;
+                    }
+                }
+                redactions.push(Redaction::new(caret, font.height()));
+                continue;
+            }
             let mut glyph = font.scaled_glyph(c);
             // if let Some(prev) = last.take() {
             //     caret.x += font.kern(prev.id, glyph.id);
@@ -142,12 +177,23 @@ pub fn layout_paragraph<F, SF>(
             caret.x += paragraph_scale;
             target.push(glyph);
         }
-        caret = point(
+        let new_caret = point(
             position.x + (fastrand::f32() * 2.0 - 1.0),
             caret.y + paragraph_height,
         );
+        if redactions.last().map_or(false, |r| r.end.is_none()) {
+            redactions.last_mut().map(|r| r.close(caret));
+            redactions.push(Redaction::new(new_caret, font.height()));
+        }
+        caret = new_caret;
         // last = None;
     }
+    // redactions.last_mut().map(|r| {
+    //     if r.is_open() {
+    //         r.close(caret);
+    //     }
+    // });
+    redactions
 }
 
 // helper to measure
