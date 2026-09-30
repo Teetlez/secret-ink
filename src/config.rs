@@ -49,4 +49,20 @@ impl Config {
         std::fs::write(path, toml::to_string_pretty(self)?)?;
         Ok(())
     }
+
+    pub fn resolve_paths(&mut self, base: impl AsRef<Path>) {
+        let base = base.as_ref();
+        for path in [
+            &mut self.default_font,
+            &mut self.heading_font,
+            &mut self.stamp_font,
+            &mut self.paper_albedo,
+            &mut self.paper_normal,
+            &mut self.paper_roughness,
+        ] {
+            if path.is_relative() {
+                *path = base.join(&*path);
+            }
+        }
+    }
 }

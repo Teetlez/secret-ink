@@ -36,7 +36,7 @@ impl Redaction {
     }
 }
 
-const header_scale: f32 = 50.0;
+const HEADER_SCALE: f32 = 50.0;
 
 /// Lay out and position glyphs for each block of the document.
 pub fn layout_blocks(
@@ -103,23 +103,23 @@ pub fn layout_blocks(
                 let font_ref = &fonts[&key];
                 let font = font_ref.as_scaled(cfg.font_size);
                 let start = point(cfg.margin_left as f32, cursor_y);
-                let text = textwrap::wrap(&text, &wrap_opts);
+                let text = textwrap::wrap(text, &wrap_opts);
                 // Collect glyphs, then convert to GlyphInstance
                 let mut temp = Vec::new();
 
                 let mut new_redactions = layout_paragraph(
-                    font.clone(),
+                    font,
                     start,
                     (cfg.page_width - cfg.margin_left - cfg.margin_right) as f32,
                     &text,
                     &mut temp,
-                    &cfg,
+                    cfg,
                 );
                 redactions.append(&mut new_redactions);
 
                 // Move cursor down by paragraph height (approximate)
                 cursor_y =
-                    &temp.last().map(|g| g.position.y).unwrap_or(cursor_y) + cfg.line_spacing;
+                    temp.last().map(|g| g.position.y).unwrap_or(cursor_y) + cfg.line_spacing;
 
                 for glyph in temp {
                     instances.push(GlyphInstance {
@@ -129,7 +129,7 @@ pub fn layout_blocks(
                 }
             }
 
-            Block::Stamp(inner) => {
+            Block::Stamp(_inner) => {
                 // TODO: schedule stamp drawing at bottom or top
             }
         }
@@ -143,7 +143,7 @@ pub fn layout_blocks(
 pub fn layout_paragraph<F, SF>(
     font: SF,
     position: ab_glyph::Point,
-    max_width: f32,
+    _max_width: f32,
     text: &Vec<Cow<'_, str>>,
     target: &mut Vec<ab_glyph::Glyph>,
     cfg: &Config,
@@ -153,17 +153,16 @@ where
     SF: ab_glyph::ScaleFont<F>,
 {
     let mut caret = position + point(0.0, font.ascent());
-    let mut last: Option<ab_glyph::Glyph> = None;
+    let _last: Option<ab_glyph::Glyph> = None;
     let mut redactions: Vec<Redaction> = Vec::new();
     for line in text {
         for c in line.chars() {
             if c == '\u{20D2}' {
-                if let Some(r) = redactions.last_mut() {
-                    if r.is_open() {
+                if let Some(r) = redactions.last_mut()
+                    && r.is_open() {
                         r.close(caret);
                         continue;
                     }
-                }
                 redactions.push(Redaction::new(caret, font.height()));
                 continue;
             }
@@ -180,8 +179,8 @@ where
             position.x + (fastrand::f32() * 2.0 - 1.0),
             caret.y + cfg.line_spacing,
         );
-        if redactions.last().map_or(false, |r| r.end.is_none()) {
-            redactions.last_mut().map(|r| r.close(caret));
+        if redactions.last().is_some_and(|r| r.end.is_none()) {
+            if let Some(r) = redactions.last_mut() { r.close(caret) }
             redactions.push(Redaction::new(new_caret, font.height()));
         }
         caret = new_caret;

@@ -17,7 +17,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let profile_path = project_dir.join("profile.toml");
     let mut config = Config::load_from(&profile_path)?;
-    resolve_config_paths(&mut config, profile_path.parent().unwrap_or(&project_dir));
+    config.resolve_paths(profile_path.parent().unwrap_or(&project_dir));
 
     let ui = MainWindow::new()?;
     apply_config(&ui, &config);
@@ -85,7 +85,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             let Some(ui) = weak.upgrade() else { return };
             match Config::load_from(&path) {
                 Ok(mut config) => {
-                    resolve_config_paths(&mut config, path.parent().unwrap_or(Path::new(".")));
+                    config.resolve_paths(path.parent().unwrap_or(Path::new(".")));
                     apply_config(&ui, &config);
                     *active_profile.borrow_mut() = path;
                     refresh_previews(&ui);
@@ -135,21 +135,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     ui.run()?;
     Ok(())
-}
-
-fn resolve_config_paths(config: &mut Config, base: &Path) {
-    for path in [
-        &mut config.default_font,
-        &mut config.heading_font,
-        &mut config.stamp_font,
-        &mut config.paper_albedo,
-        &mut config.paper_normal,
-        &mut config.paper_roughness,
-    ] {
-        if path.is_relative() {
-            *path = base.join(&*path);
-        }
-    }
 }
 
 fn apply_config(ui: &MainWindow, config: &Config) {
@@ -215,12 +200,12 @@ fn config_from_ui(ui: &MainWindow) -> Result<Config, String> {
 }
 
 fn refresh_previews(ui: &MainWindow) {
-    ui.set_albedo_preview(load_image_preview(&ui.get_paper_albedo().to_string()));
-    ui.set_normal_preview(load_image_preview(&ui.get_paper_normal().to_string()));
-    ui.set_roughness_preview(load_image_preview(&ui.get_paper_roughness().to_string()));
-    ui.set_default_font_preview(load_font_preview(&ui.get_default_font().to_string()));
-    ui.set_heading_font_preview(load_font_preview(&ui.get_heading_font().to_string()));
-    ui.set_stamp_font_preview(load_font_preview(&ui.get_stamp_font().to_string()));
+    ui.set_albedo_preview(load_image_preview(ui.get_paper_albedo().as_ref()));
+    ui.set_normal_preview(load_image_preview(ui.get_paper_normal().as_ref()));
+    ui.set_roughness_preview(load_image_preview(ui.get_paper_roughness().as_ref()));
+    ui.set_default_font_preview(load_font_preview(ui.get_default_font().as_ref()));
+    ui.set_heading_font_preview(load_font_preview(ui.get_heading_font().as_ref()));
+    ui.set_stamp_font_preview(load_font_preview(ui.get_stamp_font().as_ref()));
 }
 
 fn load_image_preview(path: &str) -> Image {

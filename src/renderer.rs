@@ -5,7 +5,7 @@ use crate::{
     layout::{GlyphInstance, Redaction},
 };
 use ab_glyph::{Font, FontRef, Glyph, ScaleFont};
-use image::{GrayImage, Luma, Rgba, RgbaImage};
+use image::{GrayImage, Luma, RgbaImage};
 use imageproc::filter::gaussian_blur_f32;
 
 /// Renders a page by stamping each glyph onto the paper canvas,
@@ -25,7 +25,7 @@ pub fn render_page(
         let font = &fonts[&inst.font_key];
 
         // 1) Rasterize: get mask and bounding-box offsets
-        let (mask, off_x, off_y) = rasterize_glyph(&inst.glyph, font);
+        let (mask, _off_x, off_y) = rasterize_glyph(&inst.glyph, font);
 
         // 2) Bleed blur
         let blurred = gaussian_blur_f32(&mask, cfg.blur_sigma);
@@ -100,7 +100,7 @@ fn rasterize_glyph(glyph: &Glyph, font: &FontRef) -> (GrayImage, i32, i32) {
     if let Some(outline) = font.outline_glyph(glyph.clone()) {
         outline.draw(|x, y, c| {
             let pixel = mask.get_pixel_mut(x, y);
-            *pixel = Luma([((c + ((fastrand::f32() * 0.2) - 0.1)) * 255.0 as f32).round() as u8]);
+            *pixel = Luma([((c + ((fastrand::f32() * 0.2) - 0.1)) * 255.0_f32).round() as u8]);
         });
     }
 

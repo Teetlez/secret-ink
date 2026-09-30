@@ -6,6 +6,7 @@ build = "build.rs"
 
 
 [dependencies]
+clap = { version = "4.5", features = ["derive"] }
 fastrand = "2.3"
 ab_glyph = "0.2"
 image = "0.25"
