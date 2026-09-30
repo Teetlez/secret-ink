@@ -1,7 +1,7 @@
-use serde::Deserialize;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug, Serialize)]
 pub struct Config {
     // Page
     pub page_width: u32,
@@ -39,9 +39,14 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load_from(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load_from(path: impl AsRef<Path>) -> Result<Self, Box<dyn std::error::Error>> {
         let s = std::fs::read_to_string(path)?;
         let cfg: Config = toml::from_str(&s)?;
         Ok(cfg)
+    }
+
+    pub fn save_to(&self, path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::write(path, toml::to_string_pretty(self)?)?;
+        Ok(())
     }
 }

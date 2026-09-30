@@ -156,7 +156,6 @@ where
     let mut last: Option<ab_glyph::Glyph> = None;
     let mut redactions: Vec<Redaction> = Vec::new();
     for line in text {
-        println!("{}", line);
         for c in line.chars() {
             if c == '\u{20D2}' {
                 if let Some(r) = redactions.last_mut() {
