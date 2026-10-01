@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use ab_glyph::FontRef;
@@ -27,6 +28,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     refresh_previews(&ui);
 
     let active_profile = Rc::new(RefCell::new(profile_path));
+    let preview_pages = Arc::new(Mutex::new(Vec::<RgbaImage>::new()));
 
     {
         let weak = ui.as_weak();
@@ -115,11 +117,35 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         let weak = ui.as_weak();
-        ui.on_preview_document(move || start_render(weak.clone(), true));
+        let preview_pages = Arc::clone(&preview_pages);
+        ui.on_preview_document(move || {
+            start_render(weak.clone(), true, Arc::clone(&preview_pages))
+        });
     }
     {
         let weak = ui.as_weak();
-        ui.on_render_document(move || start_render(weak.clone(), false));
+        let preview_pages = Arc::clone(&preview_pages);
+        ui.on_render_document(move || {
+            start_render(weak.clone(), false, Arc::clone(&preview_pages))
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let preview_pages = Arc::clone(&preview_pages);
+        ui.on_previous_preview_page(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let current = ui.get_preview_page_number().max(1) as usize;
+            show_preview_page(&ui, &preview_pages, current.saturating_sub(2));
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        let preview_pages = Arc::clone(&preview_pages);
+        ui.on_next_preview_page(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let current = ui.get_preview_page_number().max(1) as usize;
+            show_preview_page(&ui, &preview_pages, current);
+        });
     }
     {
         let weak = ui.as_weak();
@@ -241,7 +267,11 @@ fn image_to_slint(image: &RgbaImage) -> Image {
     Image::from_rgba8(pixels)
 }
 
-fn start_render(weak: slint::Weak<MainWindow>, preview: bool) {
+fn start_render(
+    weak: slint::Weak<MainWindow>,
+    preview: bool,
+    preview_pages: Arc<Mutex<Vec<RgbaImage>>>,
+) {
     let Some(ui) = weak.upgrade() else { return };
     let config = match config_from_ui(&ui) {
         Ok(config) => config,
@@ -260,37 +290,51 @@ fn start_render(weak: slint::Weak<MainWindow>, preview: bool) {
     });
 
     std::thread::spawn(move || {
-        let result = pipeline::render_document(&config, &input_path, preview)
-            .map_err(|error| error.to_string())
-            .and_then(|canvas| {
-                if !preview {
-                    canvas
-                        .save(&output_path)
-                        .map_err(|error| error.to_string())?;
-                }
-                let (width, height) = canvas.dimensions();
-                let display = if preview {
-                    canvas
-                } else {
-                    imageops::thumbnail(&canvas, 768, 768)
-                };
-                let status = if preview {
-                    format!("Preview ready: {width} x {height} px")
-                } else {
-                    format!(
-                        "Rendered {width} x {height} px to {}",
-                        output_path.display()
-                    )
-                };
-                Ok((display, status))
-            });
+        let result =
+            pipeline::render_document_pages(&config, &input_path, preview)
+                .map_err(|error| error.to_string())
+                .and_then(|pages| {
+                    let saved = if preview {
+                        None
+                    } else {
+                        let saved = pipeline::save_rendered_pages(&output_path, &pages)
+                            .map_err(|error| error.to_string())?;
+                        Some(saved)
+                    };
+                    let status =
+                        if let Some(saved) = saved {
+                            if saved.len() > 1 {
+                                let folder =
+                                    saved.first().and_then(|path| path.parent()).unwrap_or_else(
+                                        || output_path.parent().unwrap_or_else(|| Path::new(".")),
+                                    );
+                                format!("Rendered {} pages to {}", saved.len(), folder.display())
+                            } else {
+                                let (width, height) = pages[0].dimensions();
+                                format!(
+                                    "Rendered {width} x {height} px to {}",
+                                    output_path.display()
+                                )
+                            }
+                        } else {
+                            format!("Preview ready: {} page(s)", pages.len())
+                        };
+                    let thumbs = pages
+                        .iter()
+                        .map(|page| imageops::thumbnail(page, 768, 768))
+                        .collect::<Vec<_>>();
+                    Ok((thumbs, status))
+                });
 
         let _ = slint::invoke_from_event_loop(move || {
             let Some(ui) = weak.upgrade() else { return };
             ui.set_working(false);
             match result {
-                Ok((image, status)) => {
-                    ui.set_result_preview(image_to_slint(&image));
+                Ok((pages, status)) => {
+                    if let Ok(mut stored_pages) = preview_pages.lock() {
+                        *stored_pages = pages;
+                    }
+                    show_preview_page(&ui, &preview_pages, 0);
                     ui.set_has_preview(true);
                     ui.set_status_text(status.into());
                 }
@@ -298,6 +342,15 @@ fn start_render(weak: slint::Weak<MainWindow>, preview: bool) {
             }
         });
     });
+}
+
+fn show_preview_page(ui: &MainWindow, pages: &Arc<Mutex<Vec<RgbaImage>>>, index: usize) {
+    let Ok(pages) = pages.lock() else { return };
+    let Some(page) = pages.get(index) else { return };
+    ui.set_result_preview(image_to_slint(page));
+    ui.set_preview_page_number(index as i32 + 1);
+    ui.set_preview_page_count(pages.len() as i32);
+    ui.set_preview_page_label(format!("Page {} / {}", index + 1, pages.len()).into());
 }
 
 fn open_image(path: &Path) -> Result<(), String> {

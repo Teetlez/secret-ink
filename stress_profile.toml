@@ -1,0 +1,27 @@
+page_width = 1800
+page_height = 1800
+margin_top = 80
+margin_bottom = 120
+margin_left = 90
+margin_right = 90
+
+letter_spacing = 18.0
+line_spacing = 22.0
+
+default_font = "fonts/Special_Elite/SpecialElite-Regular.ttf"
+heading_font = "fonts/Pica/Pica.ttf"
+stamp_font = "fonts/stampwriter_kit/STAMPWRITER-KIT.ttf"
+font_size = 30.0
+heading_size = 52.0
+stamp_size = 64.0
+
+jitter_px = 2.8
+blur_sigma = 0.45
+ink_opacity = 0.98
+
+redaction_marker = "=="
+stamp_marker = "!!"
+
+paper_albedo = "paper/CC0-Texture-Paper01/PaperAlbedo.png"
+paper_normal = "paper/CC0-Texture-Paper01/PaperNormal.png"
+paper_roughness = "paper/CC0-Texture-Paper01/PaperRough.png"

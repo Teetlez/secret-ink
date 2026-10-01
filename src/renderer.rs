@@ -42,40 +42,37 @@ pub fn render_page(
         blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
     }
     for redaction in redactions {
-        // 1) rasterize\
-        let margin = 5;
-        let (width, height) = (
-            (redaction.end.unwrap_or_default().x - redaction.start.x).ceil() as u32 + (margin * 2),
-            (redaction.thickness * 1.2).ceil() as u32 + (margin * 2),
-        );
-        let mut r_box = GrayImage::new(width, height);
-        for x in margin..(width - margin) {
-            for y in margin..(height - margin) {
+        let margin = 4;
+        let block_width = ((redaction.end.unwrap_or_default().x - redaction.start.x).max(12.0))
+            .ceil() as u32
+            + (margin * 2);
+        let block_height = (redaction.thickness * 1.35).ceil() as u32 + (margin * 2);
+        let mut r_box = GrayImage::new(block_width, block_height);
+
+        for x in margin..(block_width - margin) {
+            for y in margin..(block_height - margin) {
                 if let Some(p) = r_box.get_pixel_mut_checked(x, y) {
-                    *p = Luma([(200.0 + (fastrand::f32() * 1000.0) - 100.0)
-                        .clamp(0.0, 255.0)
-                        .round() as u8])
+                    let band = (((x as f32 * 0.46) + (y as f32 * 0.38)) as i32) % 20;
+                    let offset = (band as f32 * 2.0) + ((fastrand::f32() - 0.5) * 18.0);
+                    let shade = (205.0 + offset).clamp(180.0, 255.0).round() as u8;
+                    *p = Luma([shade]);
                 }
             }
         }
 
-        // 2) bleed blur
-        let blurred = gaussian_blur_f32(&r_box, cfg.blur_sigma * 1.5 + (fastrand::f32() * 0.5));
+        let blurred = gaussian_blur_f32(&r_box, cfg.blur_sigma * 1.8 + (fastrand::f32() * 0.75));
 
-        // 3) jitter offset (rotate?)
         let (dx, dy) = (
-            (fastrand::f32() - 0.5) * cfg.jitter_px,
-            (fastrand::f32() - 0.5) * cfg.jitter_px,
+            (fastrand::f32() - 0.5) * cfg.jitter_px * 1.5,
+            (fastrand::f32() - 0.5) * cfg.jitter_px * 1.5,
         );
         let x0 = (redaction.start.x + dx).ceil() as u32 - margin;
         let y0 =
             ((redaction.start.y * 2.0) + dy).ceil() as u32 - (redaction.thickness as u32 + margin);
 
-        // 4) blend over document
-        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
-        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
-        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
-        blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+        for _ in 0..5 {
+            blend_ink(&mut canvas, &blurred, normal, roughness, x0, y0, cfg);
+        }
     }
     // redact(redactions, &mut canvas, cfg, normal, roughness);
     // draw_margins(&mut canvas, &cfg);

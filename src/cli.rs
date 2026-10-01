@@ -36,12 +36,22 @@ pub fn render(args: RenderArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Config::load_from(&args.profile)?;
     config.resolve_paths(args.profile.parent().unwrap_or(Path::new(".")));
 
-    let image = pipeline::render_document(&config, &args.input, false)?;
-    image.save(&args.output)?;
-    let (width, height) = image.dimensions();
-    println!(
-        "Rendered {width} x {height} px to {}",
-        args.output.display()
-    );
+    let pages = pipeline::render_document_pages(&config, &args.input, false)?;
+    let saved = pipeline::save_rendered_pages(&args.output, &pages)?;
+
+    if pages.len() == 1 {
+        let (width, height) = pages[0].dimensions();
+        println!(
+            "Rendered {width} x {height} px to {}",
+            args.output.display()
+        );
+        return Ok(());
+    }
+
+    let folder = saved
+        .first()
+        .and_then(|path| path.parent())
+        .unwrap_or_else(|| args.output.parent().unwrap_or_else(|| Path::new(".")));
+    println!("Rendered {} pages to {}", saved.len(), folder.display());
     Ok(())
 }
