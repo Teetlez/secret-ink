@@ -1,0 +1,190 @@
+import {
+    Button,
+    LineEdit,
+    Slider,
+} from "std-widgets.slint";
+
+export struct StudioConfig {
+    input_path: string,
+    output_path: string,
+    default_font: string,
+    heading_font: string,
+    stamp_font: string,
+    paper_albedo: string,
+    paper_normal: string,
+    paper_roughness: string,
+    redaction_marker: string,
+    stamp_marker: string,
+    page_width: float,
+    page_height: float,
+    margin_top: float,
+    margin_bottom: float,
+    margin_left: float,
+    margin_right: float,
+    letter_spacing: float,
+    line_spacing: float,
+    font_size: float,
+    heading_size: float,
+    stamp_size: float,
+    jitter_px: float,
+    blur_sigma: float,
+    ink_opacity: float,
+}
+
+export struct StudioViewState {
+    albedo_preview: image,
+    normal_preview: image,
+    roughness_preview: image,
+    default_font_preview: image,
+    heading_font_preview: image,
+    stamp_font_preview: image,
+    result_preview: image,
+    has_preview: bool,
+    preview_page_number: int,
+    preview_page_count: int,
+    preview_page_label: string,
+    working: bool,
+    status_text: string,
+}
+
+export global StudioState {
+    in-out property <StudioConfig> config;
+    in-out property <StudioViewState> view;
+}
+
+export global StudioTheme {
+    in-out property <bool> dark_mode: false;
+    out property <color> canvas: dark_mode ? #131a18 : #eef0e9;
+    out property <color> sidebar: dark_mode ? #1a2421 : #f8f9f4;
+    out property <color> surface: dark_mode ? #222e2a : #ffffff;
+    out property <color> paper: dark_mode ? #ded8c8 : #f5f1e6;
+    out property <color> text: dark_mode ? #e6ece7 : #25312c;
+    out property <color> muted: dark_mode ? #a6b3ab : #5e6b63;
+    out property <color> border: dark_mode ? #3a4942 : #d6ddd4;
+    out property <color> accent: dark_mode ? #df8b65 : #9b4c35;
+    out property <color> preview_well: dark_mode ? #111715 : #e2e5dd;
+}
+
+export component SectionTitle inherits Text {
+    color: StudioTheme.accent;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+export component SettingSlider inherits VerticalLayout {
+    in property <string> label;
+    in property <float> minimum;
+    in property <float> maximum;
+    in-out property <float> value;
+    spacing: 3px;
+
+    HorizontalLayout {
+        Text {
+            text: root.label;
+            color: StudioTheme.muted;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.value;
+            color: StudioTheme.text;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+
+    Slider {
+        minimum: root.minimum;
+        maximum: root.maximum;
+        value <=> root.value;
+    }
+}
+
+export component PathInput inherits VerticalLayout {
+    in property <string> label;
+    in-out property <string> path;
+    callback browse();
+    spacing: 5px;
+
+    Text {
+        text: root.label;
+        color: StudioTheme.muted;
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        LineEdit {
+            text <=> root.path;
+            accessible-label: root.label;
+            horizontal-stretch: 1;
+            height: 34px;
+        }
+
+        Button {
+            text: "Browse";
+            width: 76px;
+            clicked => { root.browse(); }
+        }
+    }
+}
+
+export component PreviewPath inherits HorizontalLayout {
+    in property <string> accessible_name;
+    in-out property <string> path;
+    callback browse();
+    spacing: 6px;
+
+    LineEdit {
+        text <=> root.path;
+        accessible-label: root.accessible_name;
+        horizontal-stretch: 1;
+        height: 32px;
+    }
+
+    Button {
+        height: 32px;
+        text: "Browse";
+        width: 68px;
+        clicked => { root.browse(); }
+    }
+}
+
+export component AssetRow inherits VerticalLayout {
+    in property <string> label;
+    in property <image> preview;
+    in-out property <string> path;
+    callback browse();
+    spacing: 8px;
+
+    Text {
+        text: root.label;
+        color: StudioTheme.muted;
+        font-size: 10px;
+    }
+
+    PreviewPath {
+        accessible_name: root.label;
+        path <=> root.path;
+        browse => { root.browse(); }
+    }
+
+    Rectangle {
+        width: 100%;
+        height: 46px;
+        background: StudioTheme.surface;
+        border-width: 1px;
+        border-color: StudioTheme.border;
+        clip: true;
+        border-radius: 4px;
+        Image {
+            horizontal-alignment: left;
+            vertical-alignment: center;
+            horizontal-tiling: repeat;
+            vertical-tiling: repeat;
+            width: 100%;
+            height: 100%;
+            source: root.preview;
+            image-fit: preserve;
+        }
+    }
+}

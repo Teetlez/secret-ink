@@ -22,9 +22,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let ui = MainWindow::new()?;
     apply_config(&ui, &config);
-    ui.set_input_path(project_dir.join("input.md").display().to_string().into());
-    ui.set_output_path(project_dir.join("output.png").display().to_string().into());
-    ui.set_status_text("Ready".into());
+    update_studio_config(&ui, |state| {
+        state.input_path = project_dir.join("input.md").display().to_string().into();
+        state.output_path = project_dir.join("output.png").display().to_string().into();
+        true
+    });
+    set_status_text(&ui, "Ready");
     refresh_previews(&ui);
 
     let active_profile = Rc::new(RefCell::new(profile_path));
@@ -58,19 +61,25 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             let Some(path) = selected else { return };
             let Some(ui) = weak.upgrade() else { return };
             let path: slint::SharedString = path.display().to_string().into();
-            match kind.as_str() {
-                "input" => ui.set_input_path(path),
-                "output" => ui.set_output_path(path),
-                "default_font" => ui.set_default_font(path),
-                "heading_font" => ui.set_heading_font(path),
-                "stamp_font" => ui.set_stamp_font(path),
-                "paper_albedo" => ui.set_paper_albedo(path),
-                "paper_normal" => ui.set_paper_normal(path),
-                "paper_roughness" => ui.set_paper_roughness(path),
-                _ => return,
+            let changed = update_studio_config(&ui, |state| {
+                match kind.as_str() {
+                    "input" => state.input_path = path,
+                    "output" => state.output_path = path,
+                    "default_font" => state.default_font = path,
+                    "heading_font" => state.heading_font = path,
+                    "stamp_font" => state.stamp_font = path,
+                    "paper_albedo" => state.paper_albedo = path,
+                    "paper_normal" => state.paper_normal = path,
+                    "paper_roughness" => state.paper_roughness = path,
+                    _ => return false,
+                }
+                true
+            });
+            if !changed {
+                return;
             }
             refresh_previews(&ui);
-            ui.set_status_text("File selection updated".into());
+            set_status_text(&ui, "File selection updated");
         });
     }
 
@@ -91,9 +100,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                     apply_config(&ui, &config);
                     *active_profile.borrow_mut() = path;
                     refresh_previews(&ui);
-                    ui.set_status_text("Profile loaded".into());
+                    set_status_text(&ui, "Profile loaded");
                 }
-                Err(error) => ui.set_status_text(format!("Could not load profile: {error}").into()),
+                Err(error) => set_status_text(&ui, format!("Could not load profile: {error}")),
             }
         });
     }
@@ -109,8 +118,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .map_err(|error| error.to_string())?;
                 Ok(())
             }) {
-                Ok(()) => ui.set_status_text("Profile saved".into()),
-                Err(error) => ui.set_status_text(format!("Could not save profile: {error}").into()),
+                Ok(()) => set_status_text(&ui, "Profile saved"),
+                Err(error) => set_status_text(&ui, format!("Could not save profile: {error}")),
             }
         });
     }
@@ -134,7 +143,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         let preview_pages = Arc::clone(&preview_pages);
         ui.on_previous_preview_page(move || {
             let Some(ui) = weak.upgrade() else { return };
-            let current = ui.get_preview_page_number().max(1) as usize;
+            let current = studio_view_state(&ui).preview_page_number.max(1) as usize;
             show_preview_page(&ui, &preview_pages, current.saturating_sub(2));
         });
     }
@@ -143,7 +152,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         let preview_pages = Arc::clone(&preview_pages);
         ui.on_next_preview_page(move || {
             let Some(ui) = weak.upgrade() else { return };
-            let current = ui.get_preview_page_number().max(1) as usize;
+            let current = studio_view_state(&ui).preview_page_number.max(1) as usize;
             show_preview_page(&ui, &preview_pages, current);
         });
     }
@@ -151,10 +160,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         let weak = ui.as_weak();
         ui.on_open_output(move || {
             let Some(ui) = weak.upgrade() else { return };
-            let path = PathBuf::from(ui.get_output_path().to_string());
+            let path = PathBuf::from(studio_config(&ui).output_path.to_string());
             match open_image(&path) {
-                Ok(()) => ui.set_status_text("Opened rendered image".into()),
-                Err(error) => ui.set_status_text(error.into()),
+                Ok(()) => set_status_text(&ui, "Opened rendered image"),
+                Err(error) => set_status_text(&ui, error),
             }
         });
     }
@@ -164,37 +173,41 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn apply_config(ui: &MainWindow, config: &Config) {
-    ui.set_page_width(config.page_width as f32);
-    ui.set_page_height(config.page_height as f32);
-    ui.set_margin_top(config.margin_top as f32);
-    ui.set_margin_bottom(config.margin_bottom as f32);
-    ui.set_margin_left(config.margin_left as f32);
-    ui.set_margin_right(config.margin_right as f32);
-    ui.set_letter_spacing(config.letter_spacing);
-    ui.set_line_spacing(config.line_spacing);
-    ui.set_font_size(config.font_size);
-    ui.set_heading_size(config.heading_size);
-    ui.set_stamp_size(config.stamp_size);
-    ui.set_jitter_px(config.jitter_px);
-    ui.set_blur_sigma(config.blur_sigma);
-    ui.set_ink_opacity(config.ink_opacity);
-    ui.set_default_font(config.default_font.display().to_string().into());
-    ui.set_heading_font(config.heading_font.display().to_string().into());
-    ui.set_stamp_font(config.stamp_font.display().to_string().into());
-    ui.set_paper_albedo(config.paper_albedo.display().to_string().into());
-    ui.set_paper_normal(config.paper_normal.display().to_string().into());
-    ui.set_paper_roughness(config.paper_roughness.display().to_string().into());
-    ui.set_redaction_marker(config.redaction_marker.clone().into());
-    ui.set_stamp_marker(config.stamp_marker.clone().into());
+    update_studio_config(ui, |state| {
+        state.page_width = config.page_width as f32;
+        state.page_height = config.page_height as f32;
+        state.margin_top = config.margin_top as f32;
+        state.margin_bottom = config.margin_bottom as f32;
+        state.margin_left = config.margin_left as f32;
+        state.margin_right = config.margin_right as f32;
+        state.letter_spacing = config.letter_spacing;
+        state.line_spacing = config.line_spacing;
+        state.font_size = config.font_size;
+        state.heading_size = config.heading_size;
+        state.stamp_size = config.stamp_size;
+        state.jitter_px = config.jitter_px;
+        state.blur_sigma = config.blur_sigma;
+        state.ink_opacity = config.ink_opacity;
+        state.default_font = config.default_font.display().to_string().into();
+        state.heading_font = config.heading_font.display().to_string().into();
+        state.stamp_font = config.stamp_font.display().to_string().into();
+        state.paper_albedo = config.paper_albedo.display().to_string().into();
+        state.paper_normal = config.paper_normal.display().to_string().into();
+        state.paper_roughness = config.paper_roughness.display().to_string().into();
+        state.redaction_marker = config.redaction_marker.clone().into();
+        state.stamp_marker = config.stamp_marker.clone().into();
+        true
+    });
 }
 
 fn config_from_ui(ui: &MainWindow) -> Result<Config, String> {
-    let page_width = ui.get_page_width().round().max(1.0) as u32;
-    let page_height = ui.get_page_height().round().max(1.0) as u32;
-    let margin_top = ui.get_margin_top().round().max(0.0) as u32;
-    let margin_bottom = ui.get_margin_bottom().round().max(0.0) as u32;
-    let margin_left = ui.get_margin_left().round().max(0.0) as u32;
-    let margin_right = ui.get_margin_right().round().max(0.0) as u32;
+    let state = studio_config(ui);
+    let page_width = state.page_width.round().max(1.0) as u32;
+    let page_height = state.page_height.round().max(1.0) as u32;
+    let margin_top = state.margin_top.round().max(0.0) as u32;
+    let margin_bottom = state.margin_bottom.round().max(0.0) as u32;
+    let margin_left = state.margin_left.round().max(0.0) as u32;
+    let margin_right = state.margin_right.round().max(0.0) as u32;
     if margin_left + margin_right >= page_width || margin_top + margin_bottom >= page_height {
         return Err("Margins must leave room for the page content".into());
     }
@@ -206,32 +219,70 @@ fn config_from_ui(ui: &MainWindow) -> Result<Config, String> {
         margin_bottom,
         margin_left,
         margin_right,
-        letter_spacing: ui.get_letter_spacing().max(1.0),
-        line_spacing: ui.get_line_spacing().max(1.0),
-        default_font: ui.get_default_font().to_string().into(),
-        heading_font: ui.get_heading_font().to_string().into(),
-        stamp_font: ui.get_stamp_font().to_string().into(),
-        font_size: ui.get_font_size().max(1.0),
-        heading_size: ui.get_heading_size().max(1.0),
-        stamp_size: ui.get_stamp_size().max(1.0),
-        jitter_px: ui.get_jitter_px().max(0.0),
-        blur_sigma: ui.get_blur_sigma().max(0.1),
-        ink_opacity: ui.get_ink_opacity().clamp(0.0, 1.0),
-        redaction_marker: ui.get_redaction_marker().to_string(),
-        stamp_marker: ui.get_stamp_marker().to_string(),
-        paper_albedo: ui.get_paper_albedo().to_string().into(),
-        paper_normal: ui.get_paper_normal().to_string().into(),
-        paper_roughness: ui.get_paper_roughness().to_string().into(),
+        letter_spacing: state.letter_spacing.max(1.0),
+        line_spacing: state.line_spacing.max(1.0),
+        default_font: state.default_font.to_string().into(),
+        heading_font: state.heading_font.to_string().into(),
+        stamp_font: state.stamp_font.to_string().into(),
+        font_size: state.font_size.max(1.0),
+        heading_size: state.heading_size.max(1.0),
+        stamp_size: state.stamp_size.max(1.0),
+        jitter_px: state.jitter_px.max(0.0),
+        blur_sigma: state.blur_sigma.max(0.1),
+        ink_opacity: state.ink_opacity.clamp(0.0, 1.0),
+        redaction_marker: state.redaction_marker.to_string(),
+        stamp_marker: state.stamp_marker.to_string(),
+        paper_albedo: state.paper_albedo.to_string().into(),
+        paper_normal: state.paper_normal.to_string().into(),
+        paper_roughness: state.paper_roughness.to_string().into(),
     })
 }
 
 fn refresh_previews(ui: &MainWindow) {
-    ui.set_albedo_preview(load_image_preview(ui.get_paper_albedo().as_ref()));
-    ui.set_normal_preview(load_image_preview(ui.get_paper_normal().as_ref()));
-    ui.set_roughness_preview(load_image_preview(ui.get_paper_roughness().as_ref()));
-    ui.set_default_font_preview(load_font_preview(ui.get_default_font().as_ref()));
-    ui.set_heading_font_preview(load_font_preview(ui.get_heading_font().as_ref()));
-    ui.set_stamp_font_preview(load_font_preview(ui.get_stamp_font().as_ref()));
+    let state = studio_config(ui);
+    let albedo_preview = load_image_preview(state.paper_albedo.as_ref());
+    let normal_preview = load_image_preview(state.paper_normal.as_ref());
+    let roughness_preview = load_image_preview(state.paper_roughness.as_ref());
+    let default_font_preview = load_font_preview(state.default_font.as_ref());
+    let heading_font_preview = load_font_preview(state.heading_font.as_ref());
+    let stamp_font_preview = load_font_preview(state.stamp_font.as_ref());
+    update_studio_view_state(ui, |view| {
+        view.albedo_preview = albedo_preview;
+        view.normal_preview = normal_preview;
+        view.roughness_preview = roughness_preview;
+        view.default_font_preview = default_font_preview;
+        view.heading_font_preview = heading_font_preview;
+        view.stamp_font_preview = stamp_font_preview;
+    });
+}
+
+fn studio_config(ui: &MainWindow) -> StudioConfig {
+    ui.global::<StudioState>().get_config()
+}
+
+fn studio_view_state(ui: &MainWindow) -> StudioViewState {
+    ui.global::<StudioState>().get_view()
+}
+
+fn update_studio_view_state(ui: &MainWindow, update: impl FnOnce(&mut StudioViewState)) {
+    let state = ui.global::<StudioState>();
+    let mut view = state.get_view();
+    update(&mut view);
+    state.set_view(view);
+}
+
+fn set_status_text(ui: &MainWindow, text: impl Into<slint::SharedString>) {
+    update_studio_view_state(ui, |state| state.status_text = text.into());
+}
+
+fn update_studio_config(ui: &MainWindow, update: impl FnOnce(&mut StudioConfig) -> bool) -> bool {
+    let state = ui.global::<StudioState>();
+    let mut config = state.get_config();
+    if !update(&mut config) {
+        return false;
+    }
+    state.set_config(config);
+    true
 }
 
 fn load_image_preview(path: &str) -> Image {
@@ -257,7 +308,7 @@ fn load_font_preview(path: &str) -> Image {
         11,
         25.0,
         &font,
-        "Confidential  0123456789",
+        "ABCDEFG abcdefg 0123456789",
     );
     image_to_slint(&sample)
 }
@@ -276,18 +327,22 @@ fn start_render(
     let config = match config_from_ui(&ui) {
         Ok(config) => config,
         Err(error) => {
-            ui.set_status_text(error.into());
+            set_status_text(&ui, error);
             return;
         }
     };
-    let input_path = PathBuf::from(ui.get_input_path().to_string());
-    let output_path = PathBuf::from(ui.get_output_path().to_string());
-    ui.set_working(true);
-    ui.set_status_text(if preview {
-        "Rendering reduced preview...".into()
-    } else {
-        "Rendering full-size image...".into()
-    });
+    let state = studio_config(&ui);
+    let input_path = PathBuf::from(state.input_path.to_string());
+    let output_path = PathBuf::from(state.output_path.to_string());
+    update_studio_view_state(&ui, |state| state.working = true);
+    set_status_text(
+        &ui,
+        if preview {
+            "Rendering reduced preview..."
+        } else {
+            "Rendering full-size image..."
+        },
+    );
 
     std::thread::spawn(move || {
         let result =
@@ -328,17 +383,17 @@ fn start_render(
 
         let _ = slint::invoke_from_event_loop(move || {
             let Some(ui) = weak.upgrade() else { return };
-            ui.set_working(false);
+            update_studio_view_state(&ui, |state| state.working = false);
             match result {
                 Ok((pages, status)) => {
                     if let Ok(mut stored_pages) = preview_pages.lock() {
                         *stored_pages = pages;
                     }
                     show_preview_page(&ui, &preview_pages, 0);
-                    ui.set_has_preview(true);
-                    ui.set_status_text(status.into());
+                    update_studio_view_state(&ui, |state| state.has_preview = true);
+                    set_status_text(&ui, status);
                 }
-                Err(error) => ui.set_status_text(format!("Render failed: {error}").into()),
+                Err(error) => set_status_text(&ui, format!("Render failed: {error}")),
             }
         });
     });
@@ -347,10 +402,15 @@ fn start_render(
 fn show_preview_page(ui: &MainWindow, pages: &Arc<Mutex<Vec<RgbaImage>>>, index: usize) {
     let Ok(pages) = pages.lock() else { return };
     let Some(page) = pages.get(index) else { return };
-    ui.set_result_preview(image_to_slint(page));
-    ui.set_preview_page_number(index as i32 + 1);
-    ui.set_preview_page_count(pages.len() as i32);
-    ui.set_preview_page_label(format!("Page {} / {}", index + 1, pages.len()).into());
+    let preview = image_to_slint(page);
+    let page_number = index as i32 + 1;
+    let page_count = pages.len() as i32;
+    update_studio_view_state(ui, |state| {
+        state.result_preview = preview;
+        state.preview_page_number = page_number;
+        state.preview_page_count = page_count;
+        state.preview_page_label = format!("Page {} / {}", page_number, page_count).into();
+    });
 }
 
 fn open_image(path: &Path) -> Result<(), String> {

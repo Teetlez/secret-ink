@@ -1,0 +1,199 @@
+import { Button, ScrollView, VerticalBox } from "std-widgets.slint";
+import {
+    AssetRow,
+    SectionTitle,
+    StudioState,
+    StudioTheme,
+} from "common.slint";
+
+export component StudioWorkspace inherits Rectangle {
+    callback browse_file(string);
+    callback preview_document();
+    callback render_document();
+    callback open_output();
+    callback previous_preview_page();
+    callback next_preview_page();
+
+    background: StudioTheme.canvas;
+
+    VerticalLayout {
+        padding: 22px;
+        spacing: 14px;
+
+        HorizontalLayout {
+            spacing: 12px;
+            VerticalLayout {
+                spacing: 3px;
+                Text {
+                    text: "Render preview";
+                    color: StudioTheme.text;
+                    font-size: 22px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: "View the page, paper, and type before export";
+                    color: StudioTheme.muted;
+                    font-size: 13px;
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            Button {
+                text: "Render preview";
+                enabled: !StudioState.view.working;
+                clicked => { root.preview_document(); }
+            }
+
+            Button {
+                text: StudioState.view.working ? "Rendering..." : "Render to file";
+                enabled: !StudioState.view.working;
+                clicked => { root.render_document(); }
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: StudioTheme.border;
+        }
+
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 16px;
+
+            ScrollView {
+                width: 390px;
+                height: 100%;
+                VerticalBox {
+                    spacing: 9px;
+
+                    SectionTitle {
+                        text: "PAPER MAPS";
+                    }
+
+                    AssetRow {
+                        label: "COLOR";
+                        preview: StudioState.view.albedo_preview;
+                        path <=> StudioState.config.paper_albedo;
+                        browse => { root.browse_file("paper_albedo"); }
+                    }
+
+                    AssetRow {
+                        label: "NORMAL";
+                        preview: StudioState.view.normal_preview;
+                        path <=> StudioState.config.paper_normal;
+                        browse => { root.browse_file("paper_normal"); }
+                    }
+
+                    AssetRow {
+                        label: "ROUGHNESS";
+                        preview: StudioState.view.roughness_preview;
+                        path <=> StudioState.config.paper_roughness;
+                        browse => { root.browse_file("paper_roughness"); }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: StudioTheme.border;
+                    }
+
+                    SectionTitle {
+                        text: "TYPEFACES";
+                    }
+
+                    AssetRow {
+                        label: "BODY";
+                        preview: StudioState.view.default_font_preview;
+                        path <=> StudioState.config.default_font;
+                        browse => { root.browse_file("default_font"); }
+                    }
+
+                    AssetRow {
+                        label: "HEADING";
+                        preview: StudioState.view.heading_font_preview;
+                        path <=> StudioState.config.heading_font;
+                        browse => { root.browse_file("heading_font"); }
+                    }
+
+                    AssetRow {
+                        label: "STAMP";
+                        preview: StudioState.view.stamp_font_preview;
+                        path <=> StudioState.config.stamp_font;
+                        browse => { root.browse_file("stamp_font"); }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 12px;
+                    SectionTitle {
+                        text: "FINAL IMAGE";
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+
+                    Button {
+                        text: "Previous";
+                        enabled: StudioState.view.has_preview && StudioState.view.preview_page_number > 1;
+                        clicked => { root.previous_preview_page(); }
+                    }
+
+                    Text {
+                        text: StudioState.view.preview_page_label;
+                        color: StudioTheme.muted;
+                        vertical-alignment: center;
+                    }
+
+                    Button {
+                        text: "Next";
+                        enabled: StudioState.view.has_preview && StudioState.view.preview_page_number < StudioState.view.preview_page_count;
+                        clicked => { root.next_preview_page(); }
+                    }
+
+                    Button {
+                        text: "Open image";
+                        enabled: !StudioState.view.working && StudioState.view.has_preview;
+                        clicked => { root.open_output(); }
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: StudioTheme.preview_well;
+                    border-width: 1px;
+                    border-color: StudioTheme.border;
+                    clip: true;
+                    Image {
+                        width: 100%;
+                        height: 100%;
+                        source: StudioState.view.result_preview;
+                        image-fit: contain;
+                        visible: StudioState.view.has_preview;
+                    }
+
+                    if (!StudioState.view.has_preview): Text {
+                        text: "Render a preview to see the finished page";
+                        color: StudioTheme.muted;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: StudioState.view.status_text;
+                    color: StudioTheme.muted;
+                    font-size: 12px;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,59 @@
+import { Button, Palette, Switch } from "std-widgets.slint";
+import { StudioTheme } from "common.slint";
+
+export component StudioHeader inherits Rectangle {
+    callback load_profile();
+    callback save_profile();
+    height: 68px;
+    background: StudioTheme.accent;
+
+    HorizontalLayout {
+        cross-axis-alignment: center;
+        padding-left: 24px;
+        padding-right: 24px;
+        spacing: 10px;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            Text {
+                text: "SECRET INK";
+                color: #f0ece0;
+                font-size: 23px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: "TYPEWRITTEN DOCUMENT GENERATOR";
+                color: #b6c1b8;
+                font-size: 10px;
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        Switch {
+            height: 50%;
+            checked: StudioTheme.dark_mode;
+            text: StudioTheme.dark_mode ? "Light mode" : "Dark mode";
+            toggled => {
+                StudioTheme.dark_mode = self.checked;
+                Palette.color-scheme = self.checked ? ColorScheme.dark : ColorScheme.light;
+            }
+        }
+
+        Button {
+            height: 50%;
+            text: "Load profile";
+            clicked => { root.load_profile(); }
+        }
+
+        Button {
+            height: 50%;
+            text: "Save profile";
+            clicked => { root.save_profile(); }
+        }
+    }
+}

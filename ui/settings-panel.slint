@@ -1,0 +1,193 @@
+import { LineEdit, ScrollView } from "std-widgets.slint";
+import {
+    PathInput,
+    SectionTitle,
+    SettingSlider,
+    StudioState,
+    StudioTheme,
+} from "common.slint";
+
+export component SettingsPanel inherits Rectangle {
+    callback browse_file(string);
+
+    background: StudioTheme.sidebar;
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+        VerticalLayout {
+            padding: 18px;
+            spacing: 12px;
+
+            SectionTitle {
+                text: "DOCUMENT";
+            }
+
+            PathInput {
+                label: "Markdown source";
+                path <=> StudioState.config.input_path;
+                browse => { root.browse_file("input"); }
+            }
+
+            PathInput {
+                label: "Rendered image";
+                path <=> StudioState.config.output_path;
+                browse => { root.browse_file("output"); }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: StudioTheme.border;
+            }
+
+            SectionTitle {
+                text: "MARKERS";
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: "Redaction";
+                        color: StudioTheme.muted;
+                    }
+
+                    LineEdit {
+                        text <=> StudioState.config.redaction_marker;
+                        height: 34px;
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: "Stamp";
+                        color: StudioTheme.muted;
+                    }
+
+                    LineEdit {
+                        text <=> StudioState.config.stamp_marker;
+                        height: 34px;
+                    }
+                }
+            }
+
+            SectionTitle {
+                text: "PAGE";
+            }
+
+            SettingSlider {
+                label: "Width (px)";
+                minimum: 512;
+                maximum: 5000;
+                value <=> StudioState.config.page_width;
+            }
+
+            SettingSlider {
+                label: "Height (px)";
+                minimum: 512;
+                maximum: 5000;
+                value <=> StudioState.config.page_height;
+            }
+
+            SettingSlider {
+                label: "Top margin";
+                minimum: 0;
+                maximum: 500;
+                value <=> StudioState.config.margin_top;
+            }
+
+            SettingSlider {
+                label: "Bottom margin";
+                minimum: 0;
+                maximum: 500;
+                value <=> StudioState.config.margin_bottom;
+            }
+
+            SettingSlider {
+                label: "Left margin";
+                minimum: 0;
+                maximum: 500;
+                value <=> StudioState.config.margin_left;
+            }
+
+            SettingSlider {
+                label: "Right margin";
+                minimum: 0;
+                maximum: 500;
+                value <=> StudioState.config.margin_right;
+            }
+
+            Rectangle {
+                height: 1px;
+                background: StudioTheme.border;
+            }
+
+            SectionTitle {
+                text: "TYPE & INK";
+            }
+
+            SettingSlider {
+                label: "Letter spacing";
+                minimum: 1;
+                maximum: 80;
+                value <=> StudioState.config.letter_spacing;
+            }
+
+            SettingSlider {
+                label: "Line spacing";
+                minimum: 1;
+                maximum: 100;
+                value <=> StudioState.config.line_spacing;
+            }
+
+            SettingSlider {
+                label: "Body size";
+                minimum: 6;
+                maximum: 100;
+                value <=> StudioState.config.font_size;
+            }
+
+            SettingSlider {
+                label: "Heading size";
+                minimum: 12;
+                maximum: 180;
+                value <=> StudioState.config.heading_size;
+            }
+
+            SettingSlider {
+                label: "Stamp size";
+                minimum: 12;
+                maximum: 180;
+                value <=> StudioState.config.stamp_size;
+            }
+
+            SettingSlider {
+                label: "Ink jitter";
+                minimum: 0;
+                maximum: 20;
+                value <=> StudioState.config.jitter_px;
+            }
+
+            SettingSlider {
+                label: "Ink blur";
+                minimum: 0;
+                maximum: 5;
+                value <=> StudioState.config.blur_sigma;
+            }
+
+            SettingSlider {
+                label: "Ink opacity";
+                minimum: 0;
+                maximum: 1;
+                value <=> StudioState.config.ink_opacity;
+            }
+
+            Rectangle {
+                height: 1px;
+                background: StudioTheme.border;
+            }
+        }
+    }
+}
